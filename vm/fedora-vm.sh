@@ -217,51 +217,60 @@ if ! sha256sum -c <(grep qcow2 Fedora-Server-41-1.4-x86_64-CHECKSUM); then
 fi
 msg_ok "Image verified"
 
-# Create VM
-msg_info "Creating Fedora VM"
-qm create $VMID -agent 1${MACHINE} -tablet 0 -localtime 1 -bios ovmf${CPU_TYPE} -cores $CORE_COUNT -memory $RAM_SIZE \
-  -name $HN -tags proxmox-helper-scripts -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
-
 # Handle storage type specific settings
 STORAGE_TYPE=$(pvesm status -storage $STORAGE | awk 'NR>1 {print $2}')
 case $STORAGE_TYPE in
 nfs | dir)
-  DISK_EXT=".qcow2"
-  DISK_REF="$VMID/"
-  DISK_IMPORT="-format qcow2"
-  THIN=""
-  ;;
+    DISK_EXT=".qcow2"
+    DISK_REF="$VMID/"
+    DISK_IMPORT="-format qcow2"
+    THIN=""
+    ;;
 btrfs)
-  DISK_EXT=".raw"
-  DISK_REF="$VMID/"
-  DISK_IMPORT="-format raw"
-  FORMAT=",efitype=4m"
-  THIN=""
-  ;;
+    DISK_EXT=".raw"
+    DISK_REF="$VMID/"
+    DISK_IMPORT="-format raw"
+    FORMAT=",efitype=4m"
+    THIN=""
+    ;;
+lvm | lvmthin)
+    DISK_EXT=""
+    DISK_REF=""
+    DISK_IMPORT="-format raw"
+    THIN="${THIN}"
+    ;;
 *)
-  DISK_EXT=".raw"
-  DISK_REF="$VMID/"
-  DISK_IMPORT=""
-  THIN="${THIN}"
-  ;;
+    DISK_EXT=".raw"
+    DISK_REF="$VMID/"
+    DISK_IMPORT=""
+    THIN="${THIN}"
+    ;;
 esac
 
 # Define disk names
 for i in {0,1}; do
-  disk="DISK$i"
-  eval DISK${i}=vm-${VMID}-disk-${i}${DISK_EXT:-}
-  eval DISK${i}_REF=${STORAGE}:${DISK_REF:-}${!disk}
+    disk="DISK$i"
+    eval DISK${i}=vm-${VMID}-disk-${i}${DISK_EXT:-}
+    if [ -z "$DISK_REF" ]; then
+        eval DISK${i}_REF=${STORAGE}:${!disk}
+    else
+        eval DISK${i}_REF=${STORAGE}:${DISK_REF}${!disk}
+    fi
 done
+
+msg_info "Creating Fedora VM"
+qm create $VMID -agent 1${MACHINE} -tablet 0 -localtime 1 -bios ovmf${CPU_TYPE} -cores $CORE_COUNT -memory $RAM_SIZE \
+    -name $HN -tags proxmox-helper-scripts -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
 
 # Import the Fedora disk image
 qm importdisk $VMID Fedora-Server-KVM-41-1.4.x86_64.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 
 qm set $VMID \
-  -efidisk0 ${DISK0_REF}${FORMAT} \
-  -scsi0 ${DISK0_REF},${DISK_CACHE}${THIN}size=4G \
-  -boot order=scsi0 \
-  -serial0 socket \
-  -description "Fedora Server 41 VM created via Helper Scripts" >/dev/null
+    -efidisk0 ${DISK0_REF}${FORMAT} \
+    -scsi0 ${DISK1_REF},${DISK_CACHE}${THIN}size=4G \
+    -boot order=scsi0 \
+    -serial0 socket \
+    -description "Fedora Server 41 VM created via Helper Scripts" >/dev/null
 
 msg_ok "Created Fedora Server VM ${CL}${BL}(${HN})"
 
