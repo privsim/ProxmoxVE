@@ -161,12 +161,189 @@ function default_settings() {
   echo -e "${BL}Creating a Fedora Server VM using the above default settings${CL}"
 }
 
-# Checks
+function advanced_settings() {
+  while true; do
+    if VMID=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set Virtual Machine ID" 8 58 $NEXTID --title "VIRTUAL MACHINE ID" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+      if [ -z "$VMID" ]; then
+        VMID="$NEXTID"
+      fi
+      if pct status "$VMID" &>/dev/null || qm status "$VMID" &>/dev/null; then
+        echo -e "${CROSS}${RD} ID $VMID is already in use${CL}"
+        sleep 2
+        continue
+      fi
+      echo -e "${DGN}Virtual Machine ID: ${BGN}$VMID${CL}"
+      break
+    else
+      exit-script
+    fi
+  done
+
+  if MACH=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "MACHINE TYPE" --radiolist --cancel-button Exit-Script "Choose Type" 10 58 2 \
+    "i440fx" "Machine i440fx" ON \
+    "q35" "Machine q35" OFF \
+    3>&1 1>&2 2>&3); then
+    if [ $MACH = q35 ]; then
+      echo -e "${DGN}Using Machine Type: ${BGN}$MACH${CL}"
+      FORMAT=""
+      MACHINE=" -machine q35"
+    else
+      echo -e "${DGN}Using Machine Type: ${BGN}$MACH${CL}"
+      FORMAT=",efitype=4m"
+      MACHINE=""
+    fi
+  else
+    exit-script
+  fi
+
+  if DISK_CACHE=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "DISK CACHE" --radiolist "Choose" --cancel-button Exit-Script 10 58 2 \
+    "0" "None (Default)" ON \
+    "1" "Write Through" OFF \
+    3>&1 1>&2 2>&3); then
+    if [ $DISK_CACHE = "1" ]; then
+      echo -e "${DGN}Using Disk Cache: ${BGN}Write Through${CL}"
+      DISK_CACHE="cache=writethrough,"
+    else
+      echo -e "${DGN}Using Disk Cache: ${BGN}None${CL}"
+      DISK_CACHE=""
+    fi
+  else
+    exit-script
+  fi
+
+  if VM_NAME=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set Hostname" 8 58 fedora --title "HOSTNAME" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $VM_NAME ]; then
+      HN="fedora"
+      echo -e "${DGN}Using Hostname: ${BGN}$HN${CL}"
+    else
+      HN=$(echo ${VM_NAME,,} | tr -d ' ')
+      echo -e "${DGN}Using Hostname: ${BGN}$HN${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if CPU_TYPE1=$(whiptail --backtitle "Proxmox VE Helper Scripts" --title "CPU MODEL" --radiolist "Choose" --cancel-button Exit-Script 10 58 2 \
+    "0" "KVM64 (Default)" ON \
+    "1" "Host" OFF \
+    3>&1 1>&2 2>&3); then
+    if [ $CPU_TYPE1 = "1" ]; then
+      echo -e "${DGN}Using CPU Model: ${BGN}Host${CL}"
+      CPU_TYPE=" -cpu host"
+    else
+      echo -e "${DGN}Using CPU Model: ${BGN}KVM64${CL}"
+      CPU_TYPE=""
+    fi
+  else
+    exit-script
+  fi
+
+  if CORE_COUNT=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Allocate CPU Cores" 8 58 2 --title "CORE COUNT" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $CORE_COUNT ]; then
+      CORE_COUNT="2"
+      echo -e "${DGN}Allocated Cores: ${BGN}$CORE_COUNT${CL}"
+    else
+      echo -e "${DGN}Allocated Cores: ${BGN}$CORE_COUNT${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if RAM_SIZE=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Allocate RAM in MiB" 8 58 2048 --title "RAM" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $RAM_SIZE ]; then
+      RAM_SIZE="2048"
+      echo -e "${DGN}Allocated RAM: ${BGN}$RAM_SIZE${CL}"
+    else
+      echo -e "${DGN}Allocated RAM: ${BGN}$RAM_SIZE${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if BRG=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set a Bridge" 8 58 vmbr0 --title "BRIDGE" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $BRG ]; then
+      BRG="vmbr0"
+      echo -e "${DGN}Using Bridge: ${BGN}$BRG${CL}"
+    else
+      echo -e "${DGN}Using Bridge: ${BGN}$BRG${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if MAC1=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set a MAC Address" 8 58 $GEN_MAC --title "MAC ADDRESS" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $MAC1 ]; then
+      MAC="$GEN_MAC"
+      echo -e "${DGN}Using MAC Address: ${BGN}$MAC${CL}"
+    else
+      MAC="$MAC1"
+      echo -e "${DGN}Using MAC Address: ${BGN}$MAC1${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if VLAN1=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set a Vlan(leave blank for default)" 8 58 --title "VLAN" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $VLAN1 ]; then
+      VLAN1="Default"
+      VLAN=""
+      echo -e "${DGN}Using Vlan: ${BGN}$VLAN1${CL}"
+    else
+      VLAN=",tag=$VLAN1"
+      echo -e "${DGN}Using Vlan: ${BGN}$VLAN1${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if MTU1=$(whiptail --backtitle "Proxmox VE Helper Scripts" --inputbox "Set Interface MTU Size (leave blank for default)" 8 58 --title "MTU SIZE" --cancel-button Exit-Script 3>&1 1>&2 2>&3); then
+    if [ -z $MTU1 ]; then
+      MTU1="Default"
+      MTU=""
+      echo -e "${DGN}Using Interface MTU Size: ${BGN}$MTU1${CL}"
+    else
+      MTU=",mtu=$MTU1"
+      echo -e "${DGN}Using Interface MTU Size: ${BGN}$MTU1${CL}"
+    fi
+  else
+    exit-script
+  fi
+
+  if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "START VIRTUAL MACHINE" --yesno "Start VM when completed?" 10 58); then
+    echo -e "${DGN}Start VM when completed: ${BGN}yes${CL}"
+    START_VM="yes"
+  else
+    echo -e "${DGN}Start VM when completed: ${BGN}no${CL}"
+    START_VM="no"
+  fi
+
+  if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "ADVANCED SETTINGS COMPLETE" --yesno "Ready to create a Fedora Server VM?" --no-button Do-Over 10 58); then
+    echo -e "${RD}Creating a Fedora Server VM using the above advanced settings${CL}"
+  else
+    header_info
+    echo -e "${RD}Using Advanced Settings${CL}"
+    advanced_settings
+  fi
+}
+
+function start_script() {
+  if (whiptail --backtitle "Proxmox VE Helper Scripts" --title "SETTINGS" --yesno "Use Default Settings?" --no-button Advanced 10 58); then
+    header_info
+    echo -e "${BL}Using Default Settings${CL}"
+    default_settings
+  else
+    header_info
+    echo -e "${RD}Using Advanced Settings${CL}"
+    advanced_settings
+  fi
+}
+
+# Replace the direct checks with start_script
 check_root
 arch_check
 pve_check
 ssh_check
-default_settings
+start_script
 
 msg_info "Validating Storage"
 while read -r line; do
@@ -183,7 +360,7 @@ done < <(pvesm status -content images | awk 'NR>1')
 
 VALID=$(pvesm status -content images | awk 'NR>1')
 if [ -z "$VALID" ]; then
-  msg_error "Unable to detect a valid storage location"
+  msg_error "Unable to detect a valid storage location."
   exit
 elif [ $((${#STORAGE_MENU[@]} / 3)) -eq 1 ]; then
   STORAGE=${STORAGE_MENU[0]}
@@ -195,13 +372,19 @@ else
       "${STORAGE_MENU[@]}" 3>&1 1>&2 2>&3) || exit
   done
 fi
-
-msg_ok "Using ${CL}${BL}$STORAGE${CL} ${GN}for storage location"
-msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}"
+msg_ok "Using ${CL}${BL}$STORAGE${CL} ${GN}for Storage Location."
+msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}."
 
 # Download and verify
 msg_info "Downloading Fedora Server image"
-wget -q --show-progress https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/images/Fedora-Server-KVM-41-1.4.x86_64.qcow2
+URL=https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/images/Fedora-Server-KVM-41-1.4.x86_64.qcow2
+sleep 2
+msg_ok "${CL}${BL}${URL}${CL}"
+wget -q --show-progress $URL
+echo -en "\e[1A\e[0K"
+FILE=$(basename $URL)
+msg_ok "Downloaded ${CL}${BL}${FILE}${CL}"
+
 wget -q https://fedoraproject.org/fedora.gpg
 wget -q https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/images/Fedora-Server-41-1.4-x86_64-CHECKSUM
 
@@ -247,22 +430,17 @@ lvm | lvmthin)
     ;;
 esac
 
-# Define disk names
 for i in {0,1}; do
     disk="DISK$i"
     eval DISK${i}=vm-${VMID}-disk-${i}${DISK_EXT:-}
-    if [ -z "$DISK_REF" ]; then
-        eval DISK${i}_REF=${STORAGE}:${!disk}
-    else
-        eval DISK${i}_REF=${STORAGE}:${DISK_REF}${!disk}
-    fi
+    eval DISK${i}_REF=${STORAGE}:${DISK_REF:-}${!disk}
 done
 
 msg_info "Creating Fedora VM"
 qm create $VMID -agent 1${MACHINE} -tablet 0 -localtime 1 -bios ovmf${CPU_TYPE} -cores $CORE_COUNT -memory $RAM_SIZE \
     -name $HN -tags proxmox-helper-scripts -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
 
-# Import the Fedora disk image
+pvesm alloc $STORAGE $VMID $DISK0 4M 1>&/dev/null
 qm importdisk $VMID Fedora-Server-KVM-41-1.4.x86_64.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 
 qm set $VMID \
@@ -270,14 +448,19 @@ qm set $VMID \
     -scsi0 ${DISK1_REF},${DISK_CACHE}${THIN}size=4G \
     -boot order=scsi0 \
     -serial0 socket \
-    -description "Fedora Server 41 VM created via Helper Scripts" >/dev/null
+    -description "<div align='center'><a href='https://Helper-Scripts.com'><img src='https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/images/logo-81x112.png'/></a>
+
+    # Fedora Server 41 VM
+
+    <a href='https://ko-fi.com/D1D7EP4GF'><img src='https://img.shields.io/badge/&#x2615;-Buy me a coffee-blue' /></a>
+    </div>" >/dev/null
 
 msg_ok "Created Fedora Server VM ${CL}${BL}(${HN})"
 
 if [ "$START_VM" == "yes" ]; then
-  msg_info "Starting Fedora Server VM"
-  qm start $VMID
-  msg_ok "Started Fedora Server VM"
+    msg_info "Starting Fedora Server VM"
+    qm start $VMID
+    msg_ok "Started Fedora Server VM"
 fi
 
 msg_ok "Completed Successfully!\n"
