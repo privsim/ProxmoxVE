@@ -222,15 +222,43 @@ msg_info "Creating Fedora VM"
 qm create $VMID -agent 1${MACHINE} -tablet 0 -localtime 1 -bios ovmf${CPU_TYPE} -cores $CORE_COUNT -memory $RAM_SIZE \
   -name $HN -tags proxmox-helper-scripts -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
 
-DISK0=vm-${VMID}-disk-0.qcow2
-DISK1=vm-${VMID}-disk-1.qcow2
+# Handle storage type specific settings
+STORAGE_TYPE=$(pvesm status -storage $STORAGE | awk 'NR>1 {print $2}')
+case $STORAGE_TYPE in
+nfs | dir)
+  DISK_EXT=".qcow2"
+  DISK_REF="$VMID/"
+  DISK_IMPORT="-format qcow2"
+  THIN=""
+  ;;
+btrfs)
+  DISK_EXT=".raw"
+  DISK_REF="$VMID/"
+  DISK_IMPORT="-format raw"
+  FORMAT=",efitype=4m"
+  THIN=""
+  ;;
+*)
+  DISK_EXT=".raw"
+  DISK_REF="$VMID/"
+  DISK_IMPORT=""
+  THIN="${THIN}"
+  ;;
+esac
 
-pvesm alloc $STORAGE $VMID $DISK0 4M 1>&/dev/null
-qm importdisk $VMID Fedora-Server-KVM-41-1.4.x86_64.qcow2 $STORAGE -format qcow2 1>&/dev/null
+# Define disk names
+for i in {0,1}; do
+  disk="DISK$i"
+  eval DISK${i}=vm-${VMID}-disk-${i}${DISK_EXT:-}
+  eval DISK${i}_REF=${STORAGE}:${DISK_REF:-}${!disk}
+done
+
+# Import the Fedora disk image
+qm importdisk $VMID Fedora-Server-KVM-41-1.4.x86_64.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 
 qm set $VMID \
-  -efidisk0 ${STORAGE}:$VMID/$DISK0,efitype=4m \
-  -scsi0 ${STORAGE}:$VMID/$DISK1,size=4G \
+  -efidisk0 ${DISK0_REF}${FORMAT} \
+  -scsi0 ${DISK0_REF},${DISK_CACHE}${THIN}size=4G \
   -boot order=scsi0 \
   -serial0 socket \
   -description "Fedora Server 41 VM created via Helper Scripts" >/dev/null
