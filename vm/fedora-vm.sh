@@ -377,7 +377,7 @@ msg_ok "Virtual Machine ID is ${CL}${BL}$VMID${CL}."
 
 # Download and verify
 msg_info "Downloading Fedora Server image"
-URL=https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/images/Fedora-Server-KVM-41-1.4.x86_64.qcow2
+URL=https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-Base-41-1.4.x86_64.qcow2
 sleep 2
 msg_ok "${CL}${BL}${URL}${CL}"
 wget -q --show-progress $URL
@@ -386,15 +386,15 @@ FILE=$(basename $URL)
 msg_ok "Downloaded ${CL}${BL}${FILE}${CL}"
 
 wget -q https://fedoraproject.org/fedora.gpg
-wget -q https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/images/Fedora-Server-41-1.4-x86_64-CHECKSUM
+wget -q https://download.fedoraproject.org/pub/fedora/linux/releases/41/Cloud/x86_64/images/Fedora-Cloud-41-1.4-x86_64-CHECKSUM
 
 msg_info "Verifying image integrity"
-if ! gpgv --keyring ./fedora.gpg Fedora-Server-41-1.4-x86_64-CHECKSUM; then
+if ! gpgv --keyring ./fedora.gpg Fedora-Cloud-41-1.4-x86_64-CHECKSUM; then
   msg_error "GPG verification failed"
   exit 1
 fi
 
-if ! sha256sum -c <(grep qcow2 Fedora-Server-41-1.4-x86_64-CHECKSUM); then
+if ! sha256sum -c <(grep qcow2 Fedora-Cloud-41-1.4-x86_64-CHECKSUM); then
   msg_error "Checksum verification failed"
   exit 1
 fi
@@ -441,16 +441,24 @@ qm create $VMID -agent 1${MACHINE} -tablet 0 -localtime 1 -bios ovmf${CPU_TYPE} 
     -name $HN -tags proxmox-helper-scripts -net0 virtio,bridge=$BRG,macaddr=$MAC$VLAN$MTU -onboot 1 -ostype l26 -scsihw virtio-scsi-pci
 
 pvesm alloc $STORAGE $VMID $DISK0 4M 1>&/dev/null
-qm importdisk $VMID Fedora-Server-KVM-41-1.4.x86_64.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
+qm importdisk $VMID Fedora-Cloud-41-1.4-x86_64.qcow2 $STORAGE ${DISK_IMPORT:-} 1>&/dev/null
 
 qm set $VMID \
     -efidisk0 ${DISK0_REF}${FORMAT} \
     -scsi0 ${DISK1_REF},${DISK_CACHE}${THIN}size=4G \
+    -ide2 ${STORAGE}:cloudinit \
     -boot order=scsi0 \
     -serial0 socket \
     -description "<div align='center'><a href='https://Helper-Scripts.com'><img src='https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/images/logo-81x112.png'/></a>
 
-    # Fedora Server 41 VM
+    # Fedora Server 41 VM with FreeIPA
+    
+    Configured for:
+    - FreeIPA Server (DNS, LDAP, Kerberos)
+    - Keycloak Integration
+    - Traefik with CrowdSec
+    - Cloudflared Tunnel
+    - Headscale Integration
 
     <a href='https://ko-fi.com/D1D7EP4GF'><img src='https://img.shields.io/badge/&#x2615;-Buy me a coffee-blue' /></a>
     </div>" >/dev/null
@@ -464,3 +472,5 @@ if [ "$START_VM" == "yes" ]; then
 fi
 
 msg_ok "Completed Successfully!\n"
+echo -e "Setup Cloud-Init before starting \n
+More info at https://github.com/tteck/Proxmox/discussions/2072 \n"
