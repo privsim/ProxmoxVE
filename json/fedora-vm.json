@@ -1,0 +1,36 @@
+{
+    "name": "Fedora Server 41",
+    "slug": "fedora-vm",
+    "categories": [
+        9
+    ],
+    "date_created": "2024-05-27",
+    "type": "vm",
+    "updateable": false,
+    "privileged": false,
+    "interface_port": null,
+    "documentation": null,
+    "website": "https://fedoraproject.org/server/",
+    "logo": "https://fedoraproject.org/w/uploads/2/2d/Logo_fedoralogo.png",
+    "description": "Fedora Server is a short-lifecycle, community-supported server operating system that enables seasoned system administrators to make use of the very latest technologies.",
+    "install_methods": [
+        {
+            "type": "default",
+            "script": "vm/fedora-vm.sh",
+            "resources": {
+                "cpu": "2",
+                "ram": "2048",
+                "hdd": "4",
+                "os": null,
+                "version": "41"
+            }
+        }
+    ],
+    "default_credentials": {
+        "username": null,
+        "password": null
+    },
+    "notes": [
+        "This script verifies the Fedora Server image using official GPG keys and checksums"
+    ]
+}
